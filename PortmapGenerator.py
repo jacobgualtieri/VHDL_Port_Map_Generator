@@ -12,6 +12,7 @@ This data is separated into three categories: Name, Generic, and Port.
 def generateEntity(filename):
     foundGenerics = False
     foundPort = False
+    componentString = "Component "
     moduleName = "null"
     generics = ""
     port = ""
@@ -23,6 +24,7 @@ def generateEntity(filename):
             rdln = fr.readline().lower()
             if rdln.startswith("entity"):
                 moduleName = rdln.split()[1]                # Save the module name for later use
+                componentString += moduleName + " is\n"
             
         while "end entity;" not in rdln:        # Parse the entity for relevant information
             if rdln.startswith("    --") or rdln.startswith("  --") or rdln.startswith("--"):
@@ -40,7 +42,12 @@ def generateEntity(filename):
             if rdln.endswith(");\n") and ("std_logic_vector" not in rdln) and foundPort:
                 foundPort = False
             rdln = fr.readline().lower()        # Read the next line from the VHDL file
-    return moduleName, generics, port
+
+            if "entity" not in rdln:
+                componentString += rdln
+
+        componentString += "end Component;\n\n"
+    return moduleName, generics, port, componentString
 
 
 """
@@ -48,10 +55,12 @@ Writes the formatted Generic Map and Port Map to a new plaintext file.
 This text can then be used in any VHDL module or test bench.
 Minor edits to the map declarations may be required; this depends on the user's project structure.
 """
-def writePortmap(name, generics, ports):
+def writePortmap(name, generics, ports, component):
     newFilename = name + "Portmap.txt"                      # Format the new filename and name of instantiation
     instanceDefinition = name + "_inst : " + name
     fw = open(newFilename, "w+")                            # Create and open a new plaintext file
+
+    fw.write(component)
 
     fw.write(instanceDefinition + "\n\tgeneric map(\n")     # Write the formatted Generic information to the file
     for param_idx in range(len(generics)):
@@ -79,7 +88,7 @@ if __name__ == "__main__":
         print("Only VHDL files are supported")
     else:
         try:
-            name, generics, ports = generateEntity(path + filename)
+            name, generics, ports, componentString = generateEntity(path + filename)
             if generics != "" and ports != "":
                 params = generics.strip().split('\n')
                 wires = ports.strip().split('\n')
@@ -101,7 +110,7 @@ if __name__ == "__main__":
                         wireData[idx2] = wireData[idx2].strip("")
                     modulePorts.append(wireData)
 
-                writePortmap(name, moduleParams, modulePorts)
+                writePortmap(name, moduleParams, modulePorts, componentString)
 
             else: print("ERR: Failed to parse entity information")
 
